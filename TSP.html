@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>TSP</title>
+    <style>
+      canvas {
+        border: 1px solid black;
+      }
+
+      .status {
+        display: inline-block;
+      }
+
+      a:link {
+        color: black;
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>
+      <a target="_blank" rel="noopener noreferrer" href="https://github.com/TelvanniChad/TravellingSpellwrightProblem">
+        Travelling Spellwright Problem code on GitHub
+      </a>
+    </h1>
+    <canvas id="canvas" width="800" height="600"></canvas>
+    <div class="status">
+      <p>
+        <button id="fortifyMysticism" onclick="fortifyMysticism()"><strong>Fortify Mysticism</strong></button>
+      </p>
+      <p>
+        <button onclick="location.reload()"><strong>Recall</strong></button>
+      </p>
+      <p>
+        Locations Amount: <span id="locationsTotalAmount"></span>
+      </p>
+      <p>
+        Best Distance: <span id="bestDistance"></span>
+      </p>
+      <p>
+        Current Generation: <span id="currentGeneration"></span> of <span id="generationsAmount"></span>
+      </p>
+    </div>
+  </body>
+  <script type="text/javascript">
+    function drawLine(fromX, fromY, toX, toY, c) {
+      // Tyrian purple
+      c.strokeStyle = '#66023C';
+      // draw line
+      c.beginPath();
+      c.moveTo(fromX, fromY);
+      c.lineTo(toX, toY);
+      c.stroke();
+    };
+
+    function drawLocation(location, radius, c) {
+      // draw red dot
+      c.fillStyle = 'red';
+      c.beginPath();
+      c.arc(location.x, location.y, radius, 0, Math.PI*2);
+      c.fill();
+      // draw black circle around that red dot
+      c.strokeStyle = 'black';
+      c.beginPath();
+      c.arc(location.x, location.y, radius, 0, Math.PI*2);
+      c.stroke();
+      // if location has a name, write it under the dot
+      if (location.name) {
+        c.fillStyle = 'black';
+        c.fillText(location.name, location.x, location.y + radius * 4);
+      };
+    };
+
+    function drawMap(G) {
+      // through destructuring get variables that will not be changed in this function
+      const {
+        canvas,
+        ctx,
+        locationRadius,
+        locationsQueue,
+        locationsTotalAmount,
+      } = G;
+      // remove everything from canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // make lines solid
+      ctx.setLineDash([]);
+      // draw all locations
+      locationsQueue.map((location) => {
+        drawLocation(location, locationRadius, ctx);
+      });
+      // make lines dashed
+      ctx.setLineDash([4, 2]);
+      // draw all lines between locations, except line between first and last location
+      for (let i = 1; i < locationsTotalAmount; i++) {
+        drawLine(
+          locationsQueue[i].x,
+          locationsQueue[i].y,
+          locationsQueue[i - 1].x,
+          locationsQueue[i - 1].y,
+          ctx,
+        );
+      };
+      // draw a line between first and last location
+      drawLine(
+        locationsQueue[0].x,
+        locationsQueue[0].y,
+        locationsQueue[locationsTotalAmount - 1].x,
+        locationsQueue[locationsTotalAmount - 1].y,
+        ctx,
+      );
+    };
+
+    function fitness(G) {
+      // through destructuring get variables that will not be changed in this function
+      const {
+        locationsQueue,
+        locationsTotalAmount,
+      } = G;
+      let distance = 0;
+      /**
+       * calculate distances between all subsequent elements (locations) in locationsQueue array
+       * except distance between first and last location
+       */
+      for (let j = 1; j < locationsTotalAmount; j++) {
+        distance += getDistance(locationsQueue[j], locationsQueue[j - 1]);
+      };
+      // calculate distance between first and last location
+      distance += getDistance(locationsQueue[0], locationsQueue[locationsTotalAmount - 1]);
+      // return calculated distance
+      return distance;
+    };
+
+    // entry point function
+    function fortifyMysticism() {
+      /**
+       * requestAnimationFrame is used to see all generations drawn on canvas, not just the last one.
+       * Lambda function is used to pass an argument to nextGeneration function
+       */
+      document.getElementById('fortifyMysticism').disabled = true;
+      requestAnimationFrame(function() { nextGeneration(G); });
+    };
+
+    function getDistance(locationOne, locationTwo) {
+      let a = locationOne.x - locationTwo.x;
+      let b = locationOne.y - locationTwo.y;
+      return Math.sqrt(a * a + b * b);
+    };
+
+    function mutate(randIndex, G) {
+      /**
+       * remove and save random amount of elements from locationsQueue
+       * starting from element with index randIndex
+       */
+      let locations = G.locationsQueue.splice(randIndex, Math.floor(Math.random() * (G.locationsQueue.length - randIndex)));
+      // 50% chance to reverse locations array
+      if (Math.random() < 0.5) {
+        locations.reverse();
+      };
+      while (locations.length > 0) {
+        /**
+         * using ternary operator, get random element's index from the locations array
+         * or first element's index (0) of the locations array
+         */
+        const spliceFromIndex = Math.random() < 0.5 ? 0 : Math.floor(Math.random() * locations.length);
+        /**
+         * remove and save elements from the locations array
+         * starting from element with index spliceFromIndex to the end of locations array
+         */
+        const locationsToInsert = locations.splice(spliceFromIndex);
+        // get random element's index from the locationsQueue array
+        const insertAtIndex = Math.floor(Math.random() * G.locationsQueue.length);
+        /**
+         * insert locationsToInsert into locationsQueue at insertAtIndex
+         * Spread syntax (three dots in ...locationsToInsert) means that elements
+         * will be inserted one by one, not as a whole iterable (array in this case)
+         */
+        G.locationsQueue.splice(insertAtIndex, 0, ...locationsToInsert);
+      };
+    };
+
+    function nextGeneration(G) {
+      // through destructuring get variables that will not be changed in this function
+      const {
+        bestDistanceSpan,
+        bestDistance,
+        currentGenerationSpan,
+        generationsAmount,
+        locationsTotalAmount,
+      } = G;
+      if (G.currentGeneration < generationsAmount) {
+        G.currentGeneration += 1;
+        for (let i = 0; i < locationsTotalAmount; i++) {
+          // mutate locationsQueue
+          mutate(Math.floor(Math.random() * locationsTotalAmount), G);
+          // evaluate fitness (distance) of the mutated locationsQueue
+          const distance = fitness(G);
+          // select bestLocationsQueue (with shortest distance)
+          selection(distance, G);
+        };
+        // draw locations and lines
+        drawMap(G);
+        // display currentGeneration on the page
+        currentGenerationSpan.innerHTML = G.currentGeneration;
+        // display bestDistance on the page
+        bestDistanceSpan.innerHTML = Math.round(bestDistance);
+        // start next generation
+        requestAnimationFrame(function() { nextGeneration(G); });
+      };
+    };
+
+    function selection(distance, G) {
+      /**
+       * if bestDistance was not yet set
+       * or distance between locations of this locationsQueue
+       * is shorter than distance between locations of bestLocationsQueue
+       */
+      if (G.bestDistance === null || distance < G.bestDistance) {
+        // stringify locationsQueue array to copy it entirely, not just reference to it
+        G.bestLocationsQueue = JSON.stringify(G.locationsQueue);
+        G.bestDistance = distance;
+      // otherwise rollback locationsQueue to the bestLocationsQueue
+      } else {
+        // restore bestLocationsQueue array from a string
+        G.locationsQueue = JSON.parse(G.bestLocationsQueue);
+      };
+    };
+
+    /**
+     * references to all Structural and values of all Primitive
+     * global variables will be stored in this object
+     */
+    const G = {};
+    // array of all locations
+    G.locationsQueue = [
+      {x: 300, y: 260, name: 'Ald\'ruhn'},
+      {x: 110, y: 125, name: 'Ald Velothi'},
+      {x: 570, y: 140, name: 'Ahemmusa Camp'},
+      {x: 280, y: 420, name: 'Balmora'},
+      {x: 310, y: 340, name: 'Caldera'},
+      {x: 500, y: 50, name: 'Dagon Fel'},
+      {x: 370, y: 570, name: 'Ebonheart'},
+      {x: 595, y: 400, name: 'Erabenimsun Camp'},
+      {x: 380, y: 300, name: 'Ghost Gate'},
+      {x: 210, y: 320, name: 'Gnaar Mok'},
+      {x: 120, y: 180, name: 'Gnisis'},
+      {x: 230, y: 460, name: 'Hla Oad'},
+      {x: 720, y: 450, name: 'Holamayan Monastery'},
+      {x: 140, y: 105, name: 'Khuul'},
+      {x: 280, y: 160, name: 'Maar Gan'},
+      {x: 590, y: 500, name: 'Molag Mar'},
+      {x: 330, y: 500, name: 'Pelagiad'},
+      {x: 700, y: 310, name: 'Sadrith Mora'},
+      {x: 290, y: 520, name: 'Seyda Neen'},
+      {x: 730, y: 510, name: 'Shrine of Azura'},
+      {x: 450, y: 490, name: 'Suran'},
+      {x: 615, y: 290, name: 'Tel Aruhn'},
+      {x: 610, y: 560, name: 'Tel Branora'},
+      {x: 610, y: 360, name: 'Tel Fyr'},
+      {x: 600, y: 170, name: 'Tel Mora'},
+      {x: 545, y: 185, name: 'Tel Vos'},
+      {x: 275, y: 90, name: 'Urshilaku Camp'},
+      {x: 360, y: 30, name: 'Vas'},
+      {x: 400, y: 550, name: 'Vivec'},
+      {x: 575, y: 195, name: 'Vos'},
+      {x: 705, y: 340, name: 'Wolverine Hall'},
+      {x: 520, y: 230, name: 'Zainab Camp'},
+    ];
+
+    // to use canvas element
+    G.canvas = document.getElementById('canvas');
+    G.ctx = canvas.getContext('2d');
+    // amount of generations in the Evolutionary Algorithm
+    G.generationsAmount = 10000;
+    // location radius for drawing on canvas
+    G.locationRadius = 5;
+    // total amount of locations on the map
+    G.locationsTotalAmount = G.locationsQueue.length;
+    // current generation of the Evolutionary Algorithm
+    G.currentGeneration = 0;
+    // best (with shortest distance) queue of locations
+    G.bestLocationsQueue = null;
+    /**
+     * shortest distance between locations
+     * when they are connected in the same order as in locationsQueue
+     */
+    G.bestDistance = null;
+    // get those spans to display currentGeneration and bestDistance on the page
+    G.currentGenerationSpan = document.getElementById('currentGeneration');
+    G.bestDistanceSpan = document.getElementById('bestDistance');
+    // set values of properties for writing text
+    G.ctx.font = '15px cursive';
+    G.ctx.textAlign = 'center';
+    // display currentGeneration on the page
+    G.currentGenerationSpan.innerHTML = G.currentGeneration;
+    // display locationsTotalAmount on the page
+    document.getElementById('locationsTotalAmount').innerHTML = G.locationsTotalAmount;
+    // display generationsAmount on the page
+    document.getElementById('generationsAmount').innerHTML = G.generationsAmount;
+    // draw all initial locations
+    G.locationsQueue.map((location) => {
+      drawLocation(location, G.locationRadius, G.ctx);
+    });
+  </script>
+</html>
